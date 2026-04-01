@@ -16,7 +16,7 @@
  * Plugin Name:       SRKP Live Support
  * Plugin URI:        https://github.com/keshavsharma262001-ops/srkp-live-support
  * Description:       Real-time live chat for WordPress with an admin inbox and Pusher-powered visitor messaging.
- * Version:           1.0.0
+ * Version:           1.0.1
  * Author:            SRKP Team
  * Author URI:        https://github.com/keshavsharma262001-ops/srkp-live-support
  * Requires at least: 5.0
