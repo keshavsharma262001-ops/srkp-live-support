@@ -23,8 +23,8 @@ if ( ! defined( 'ABSPATH' ) ) { exit; }
                         <th scope="row">Enable Chat Support</th>
                         <td>
                             <label class="srkp-switch">
-                                <input type="checkbox" name="srkp_enable_chat" value="1" <?php $enable_chat = get_option('srkp_enable_chat', 0);
-                                 checked(1, $enable_chat, true); ?> />
+                                <input type="checkbox" name="srkp_enable_chat" value="1" <?php $srkp_enable_chat = get_option('srkp_enable_chat', 0);
+                                 checked(1, $srkp_enable_chat, true); ?> />
                                 <span class="srkp-slider round"></span>
                             </label>
                         </td>
@@ -42,36 +42,36 @@ if ( ! defined( 'ABSPATH' ) ) { exit; }
                     </td>
                     </tr>
                     <!-- Pusher App ID -->
-                    <?php $enable_chat = get_option('srkp_enable_chat', 0); ?>
-                    <tr class="srkp_enable_chat_credentials" style="display: <?php echo $enable_chat ? 'table-row' : 'none'; ?>;">
+                    <?php $srkp_enable_chat = get_option('srkp_enable_chat', 0); ?>
+                    <tr class="srkp_enable_chat_credentials" style="display: <?php echo $srkp_enable_chat ? 'table-row' : 'none'; ?>;">
                     <th scope="row">Timezone</th>
                         <td>
-                            <?php  $saved_tz = get_option('srkp_timezone','Asia/Kolkata'); ?>
+                            <?php  $srkp_saved_tz = get_option('srkp_timezone','Asia/Kolkata'); ?>
                             <select class="srkp_timezone" name="srkp_timezone">
-                                <?php foreach (timezone_identifiers_list() as $tz): ?>
-                                    <option value="<?php echo esc_attr($tz); ?>"
-                                        <?php selected($saved_tz, $tz); ?>>
-                                        <?php echo esc_html($tz); ?>
+                                <?php foreach (timezone_identifiers_list() as $srkp_tz): ?>
+                                    <option value="<?php echo esc_attr($srkp_tz); ?>"
+                                        <?php selected($srkp_saved_tz, $srkp_tz); ?>>
+                                        <?php echo esc_html($srkp_tz); ?>
                                     </option>
                                 <?php endforeach; ?>
                             </select>
                         </td>
                     </tr>
-                    <tr class="srkp_enable_chat_credentials" style="display: <?php echo $enable_chat ? 'table-row' : 'none'; ?>;">
+                    <tr class="srkp_enable_chat_credentials" style="display: <?php echo $srkp_enable_chat ? 'table-row' : 'none'; ?>;">
                         <th scope="row">Pusher App ID</th>
                         <td>
                             <input type="text" name="srkp_pusher_app_id" value="<?php echo esc_attr(get_option('srkp_pusher_app_id', '')); ?>" style="width:60%;" required>
                         </td>
                     </tr>
 
-                    <tr class="srkp_enable_chat_credentials" style="display: <?php echo $enable_chat ? 'table-row' : 'none'; ?>;">
+                    <tr class="srkp_enable_chat_credentials" style="display: <?php echo $srkp_enable_chat ? 'table-row' : 'none'; ?>;">
                         <th scope="row">Pusher Key</th>
                         <td>
                             <input type="text" name="srkp_pusher_key" value="<?php echo esc_attr(get_option('srkp_pusher_key', '')); ?>" style="width:60%;" required>
                         </td>
                     </tr>
 
-                    <tr class="srkp_enable_chat_credentials" style="display: <?php echo $enable_chat ? 'table-row' : 'none'; ?>;">
+                    <tr class="srkp_enable_chat_credentials" style="display: <?php echo $srkp_enable_chat ? 'table-row' : 'none'; ?>;">
                         <th scope="row">Pusher Secret</th>
                         <td>
                             <input type="text" name="srkp_pusher_secret" value="<?php echo esc_attr(get_option('srkp_pusher_secret', '')); ?>" style="width:60%;" required>
@@ -79,7 +79,7 @@ if ( ! defined( 'ABSPATH' ) ) { exit; }
                         </td>
                     </tr>
 
-                    <tr class="srkp_enable_chat_credentials" style="display: <?php echo $enable_chat ? 'table-row' : 'none'; ?>;">
+                    <tr class="srkp_enable_chat_credentials" style="display: <?php echo $srkp_enable_chat ? 'table-row' : 'none'; ?>;">
                         <th scope="row">Pusher Cluster</th>
                         <td>
                             <input type="text" name="srkp_pusher_cluster" value="<?php echo esc_attr(get_option('srkp_pusher_cluster', '')); ?>" style="width:60%;" required><br>
@@ -173,9 +173,9 @@ if ( ! defined( 'ABSPATH' ) ) { exit; }
                         <th scope="row">Support Icon</th>
                      <td class="srkp_support_icon_upload">
                         <!-- Upload Wrapper -->
-                          <?php $icon = get_option('srkp_support_icon'); 
-                          $imagename= explode('/', $icon);
-                            $imagename = end($imagename); 
+                          <?php $srkp_icon = get_option('srkp_support_icon'); 
+                          $srkp_imagename = explode('/', $srkp_icon);
+                            $srkp_imagename = end($srkp_imagename); 
                           ?>
                         <div class="srkp-upload-wrapper">
                             <label class="srkp-upload-box">
@@ -190,13 +190,13 @@ if ( ! defined( 'ABSPATH' ) ) { exit; }
                         </div>
                         <!-- Hidden field storing image URL -->
                        
-                       <input type="hidden" id="srkp_support_icon" name="srkp_support_icon" value="<?php echo esc_attr($icon); ?>">
+                       <input type="hidden" id="srkp_support_icon" name="srkp_support_icon" value="<?php echo esc_attr($srkp_icon); ?>">
                         <!-- Preview Wrapper -->
 
                         <div class="srkp_support_icon_preview_wrapper">
-                            <?php if(!empty($icon)):?>
+                            <?php if(!empty($srkp_icon)):?>
                             <img id="srkp_support_icon_preview"
-                                src="<?php echo $icon ? esc_url($icon) : "" ?>"
+                                src="<?php echo $srkp_icon ? esc_url($srkp_icon) : "" ?>"
                                 data-default="" alt="Icon Preview">
                                 <i id="srkp_support_icon_font"class="fa-regular fa-message" style="display:none"></i>  
                             <?php else: ?>
@@ -204,7 +204,7 @@ if ( ! defined( 'ABSPATH' ) ) { exit; }
                             <i id="srkp_support_icon_font"class="fa-regular fa-message"></i>                                
                             <?php endif; ?>
                             <span class="srkp-remove-icon"
-                                style="display: <?php echo $icon ? 'inline-block' : 'none'; ?>;">&times;</span>
+                                style="display: <?php echo $srkp_icon ? 'inline-block' : 'none'; ?>;">&times;</span>
                         </div>
                         <br><br>
                     </td>

@@ -73,7 +73,7 @@ class Srkp_Live_Support
 		if (defined('SRKP_LIVE_SUPPORT_VERSION')) {
 			$this->version = SRKP_LIVE_SUPPORT_VERSION;
 		} else {
-			$this->version = '1.0.0';
+			$this->version = '1.0.2';
 		}
 		$this->plugin_name = 'srkp-live-support';
 
@@ -195,7 +195,6 @@ class Srkp_Live_Support
 		$this->loader->add_action('wp_ajax_nopriv_srkp_chat_send', $plugin_public, 'wp_ajax_srkp_chat_send_data');
 		$this->loader->add_action('wp_ajax_srkp_save_guest_email',$plugin_public, 'srkp_save_guest_email');
 		$this->loader->add_action('wp_ajax_nopriv_srkp_save_guest_email',$plugin_public, 'srkp_save_guest_email');
-		$this->loader->add_action('init',$plugin_public, 'srkp_start_session', 1);
 		
 	}
 

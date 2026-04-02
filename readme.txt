@@ -5,7 +5,7 @@ Tags: live chat, support chat, customer support, real-time chat, helpdesk
 Requires at least: 5.0
 Requires PHP: 7.4
 Tested up to: 6.9
-Stable tag: 1.0.1
+Stable tag: 1.0.2
 License: GPLv2 or later
 License URI: http://www.gnu.org/licenses/gpl-2.0.html
 
@@ -96,6 +96,10 @@ Yes, all chats are safely stored in your WordPress database.
 
 == Changelog ==
 
+= 1.0.2 =
+* Fixed Plugin Check warnings for non-prefixed template variables.
+* Synced plugin version metadata across bootstrap and readme.
+
 = 1.0.0 =
 * Initial release.
 * Real-time chat via Pusher.
@@ -104,6 +108,9 @@ Yes, all chats are safely stored in your WordPress database.
 * Floating chat support button.
 
 == Upgrade Notice ==
+
+= 1.0.2 =
+Maintenance update with Plugin Check fixes and version consistency improvements.
 
 = 1.0.0 =
 Major first stable release of SRKP Live Support. Update recommended for full functionality.

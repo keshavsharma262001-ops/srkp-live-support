@@ -27,6 +27,7 @@ use Pusher\Pusher;
 class Srkp_Live_Support_Public
 {
 	private $pusher;
+	private $guest_cookie_lifetime = 3600;
 
 	/**
 	 * The ID of this plugin.
@@ -67,11 +68,25 @@ class Srkp_Live_Support_Public
 	 */
 	public function enqueue_styles()
 	{
-
-
 		wp_enqueue_style($this->plugin_name, plugin_dir_url(__FILE__) . 'css/srkp-live-support-public.css', array(), filemtime(plugin_dir_path(__FILE__) . 'css/srkp-live-support-public.css'), 'all');
 		wp_enqueue_style($this->plugin_name.'-font', plugin_dir_url(dirname(__FILE__)) . 'fontawesome/css/fontawesome.min.css', [], filemtime(plugin_dir_path(dirname(__FILE__)) . 'fontawesome/css/fontawesome.min.css'));
 		wp_enqueue_style($this->plugin_name . '-fa-solid',plugin_dir_url(dirname(__FILE__)) . 'fontawesome/css/solid.min.css',[],filemtime(plugin_dir_path(dirname(__FILE__)) . 'fontawesome/css/solid.min.css'));
+
+		$btn_bg_color = sanitize_hex_color(get_option('srkp_btn_bg_color', '#ff0000')) ?: '#ff0000';
+		$btn_txt_color = sanitize_hex_color(get_option('srkp_btn_txt_color', '#ffffff')) ?: '#ffffff';
+		$chatbox_txt = sanitize_hex_color(get_option('srkp_chatbox_txt_color', '#000000')) ?: '#000000';
+		$inline_css = "
+			.srkp-date-separator{color: {$chatbox_txt};}
+			#srkp-save-email,
+			#srkp-verify-otp{
+				background-color: {$btn_bg_color};
+				color: {$btn_txt_color};
+				margin-top: 10px;
+				width: 100%;
+				padding: 10px;
+				border-radius: 5px;
+			}";
+		wp_add_inline_style($this->plugin_name, $inline_css);
 	}
 
 	/**
@@ -81,17 +96,16 @@ class Srkp_Live_Support_Public
 	 */
 	public function enqueue_scripts()
 	{
+		$this->maybe_expire_guest_context();
 
 		$srkp_pusher_key     = get_option('srkp_pusher_key', '');
 		$srkp_pusher_cluster = get_option('srkp_pusher_cluster', 'ap2');
 		wp_enqueue_script('pusher-js', plugin_dir_url(__FILE__) . 'js/pusher.min.js', [], filemtime(plugin_dir_path(__FILE__) . 'js/pusher.min.js'), true);
 		wp_enqueue_script($this->plugin_name, plugin_dir_url(__FILE__) . 'js/srkp-live-support-public.js', ['jquery', 'pusher-js'], filemtime(plugin_dir_path(__FILE__) . 'js/srkp-live-support-public.js'), true);
 		$user_id = get_current_user_id();
-		if (!$user_id && session_id()) {
-			$user_id = isset($_SESSION['srkp_guest_id']) ? sanitize_text_field($_SESSION['srkp_guest_id']) : '';
-		}
-		if ($user_id && session_id() && !empty($_SESSION['srkp_guest_id'])) {
-			$user_id = isset($_SESSION['srkp_guest_id']) ? sanitize_text_field($_SESSION['srkp_guest_id']) : '';
+		$guest_context = $this->get_guest_context();
+		if (!$user_id && !empty($guest_context['guest_id'])) {
+			$user_id = $guest_context['guest_id'];
 		}
 		// Localize data
 		wp_localize_script($this->plugin_name, 'srkp_chat_ajax', [
@@ -110,6 +124,7 @@ class Srkp_Live_Support_Public
 		global $wpdb;
 		$table = esc_sql($wpdb->prefix . 'srkp_live_chat');
 		$messages_table = esc_sql($wpdb->prefix . 'srkp_live_chat_messages');
+		$messages = [];
 
 		if (is_user_logged_in()) {
 			$email = wp_get_current_user()->user_email;
@@ -124,20 +139,18 @@ class Srkp_Live_Support_Public
 			$messages = $row ? json_decode($row->messages, true) : [];
 			wp_cache_set($cache_key, $messages, '', 30);
 		} else {
-			session_start();
-			if (!$user_id && session_id()) {
-				$user_id = isset($_SESSION['srkp_guest_id']) ? sanitize_text_field($_SESSION['srkp_guest_id']) : '';
-				if ($user_id) {
-					$cache_key = 'srkp_chat_' . md5('guest_' . $user_id);
-					$cached = wp_cache_get($cache_key);
-					if ($cached !== false) {
-						wp_send_json_success($cached);
-					}
-					// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
-					$row = $wpdb->get_row($wpdb->prepare("SELECT u.id, m.messages, m.id AS message_id FROM {$wpdb->prefix}srkp_live_chat AS u LEFT JOIN {$wpdb->prefix}srkp_live_chat_messages AS m ON u.id = m.user_id WHERE u.user_id = %s", $user_id));
-					$messages = $row ? json_decode($row->messages, true) : [];
-					wp_cache_set($cache_key, $messages, '', 30);
+			$guest_context = $this->get_guest_context();
+			$user_id = !empty($guest_context['guest_id']) ? $guest_context['guest_id'] : '';
+			if ($user_id) {
+				$cache_key = 'srkp_chat_' . md5('guest_' . $user_id);
+				$cached = wp_cache_get($cache_key);
+				if ($cached !== false) {
+					wp_send_json_success($cached);
 				}
+				// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
+				$row = $wpdb->get_row($wpdb->prepare("SELECT u.id, m.messages, m.id AS message_id FROM {$wpdb->prefix}srkp_live_chat AS u LEFT JOIN {$wpdb->prefix}srkp_live_chat_messages AS m ON u.id = m.user_id WHERE u.user_id = %s", $user_id));
+				$messages = $row ? json_decode($row->messages, true) : [];
+				wp_cache_set($cache_key, $messages, '', 30);
 			}
 		}
 		wp_send_json_success($messages);
@@ -158,12 +171,16 @@ class Srkp_Live_Support_Public
 		$messages_table = esc_sql($wpdb->prefix . 'srkp_live_chat_messages');
 		$saved_tz = get_option('srkp_timezone','Asia/Kolkata');
 		$dt = new DateTime('now', new DateTimeZone($saved_tz));
+		$user_id = '';
+		$guest_user_id = '';
+		$is_first_message = false;
+		$messages = [];
 		if (is_user_logged_in()) {
 			$current_user = wp_get_current_user();
 			$name  = $current_user->display_name;
 			$email = $current_user->user_email;
 			$type  = 'user';
-			$cache_key = 'srkp_live_chat_user_' . $user_id;
+			$cache_key = 'srkp_live_chat_user_' . md5($email);
 			$row = wp_cache_get( $cache_key, 'srkp_live_chat' );
 
 			if ( $row === false ) {
@@ -219,14 +236,9 @@ class Srkp_Live_Support_Public
 
 				$this->insert_message($messages_table, $main_id, $messages);
 			}
-			if (!session_id()) {
-				session_start();
-			}
-			$_SESSION['srkp_guest_id'] = $user_id ? $user_id : $guest_user_id;
-			$_SESSION['srkp_session_start'] = time();
-			$_SESSION['srkp_guest_email'] = $current_user->user_email;
+			$this->clear_guest_context();
 
-			$this->chat_room($user_id, $new_message);
+			$this->chat_room($user_id ? $user_id : $guest_user_id, $new_message);
 
 			if ($is_first_message) {
 				wp_send_json_success([
@@ -241,16 +253,16 @@ class Srkp_Live_Support_Public
 				]);
 			}
 		} else {
-			session_start();
-			if (!$user_id && session_id()) {
-				$user_id = isset($_SESSION['srkp_guest_id']) ? sanitize_text_field($_SESSION['srkp_guest_id']) : '';
+			$guest_context = $this->get_guest_context();
+			$user_id = !empty($guest_context['guest_id']) ? $guest_context['guest_id'] : '';
 
-				$new_message = [
-					'sender' => 'user',
-					'message' => isset($_POST['message']) ? sanitize_text_field(wp_unslash($_POST['message'])) : '',
-					'time' => $dt->format('Y-m-d H:i:s'),
-					'user_id' => $user_id
-				];
+			$new_message = [
+				'sender' => 'user',
+				'message' => isset($_POST['message']) ? sanitize_text_field(wp_unslash($_POST['message'])) : '',
+				'time' => $dt->format('Y-m-d H:i:s'),
+				'user_id' => $user_id
+			];
+			if ($user_id) {
 				// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
 				$row = $wpdb->get_row($wpdb->prepare("SELECT u.id AS user_id, m.messages ,m.id AS message_id,m.unread_count FROM {$wpdb->prefix}srkp_live_chat AS u LEFT JOIN {$wpdb->prefix}srkp_live_chat_messages AS m ON u.id = m.user_id WHERE u.user_id = %s", $user_id),);
 				$messages = (!empty($row->messages)) ? json_decode($row->messages, true) : [];
@@ -272,11 +284,10 @@ class Srkp_Live_Support_Public
 				if ($row && empty($row->message_id)) {
 					// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
 					$this->update_user($table, $row->user_id, 'active');
-					// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
 					$this->insert_message($messages_table, $row->user_id, $messages);
 				}
+				wp_cache_delete('srkp_live_chat_user_' . $user_id, 'srkp_live_chat');
 			}
-			wp_cache_delete( $cache_key, 'srkp_live_chat' );
 			$this->chat_room($user_id, $new_message);
 			wp_send_json_success($new_message);
 		}
@@ -499,10 +510,7 @@ class Srkp_Live_Support_Public
 				));
 				wp_cache_set("srkp_chat_user_" . md5($guest_email), $user_row, '', MINUTE_IN_SECONDS * 30);
 
-				if (!session_id()) session_start();
-				$_SESSION['srkp_guest_id'] = $user_row->user_id;
-				$_SESSION['srkp_session_start'] = time();
-				$_SESSION['srkp_guest_email'] = $guest_email;
+				$this->set_guest_context($user_row->user_id, $guest_email);
 
 				wp_send_json_success([
 					'message' => 'OTP verified successfully.',
@@ -516,35 +524,96 @@ class Srkp_Live_Support_Public
 
 	function srkp_start_session()
 	{
+		$this->maybe_expire_guest_context();
+	}
+
+	public function get_guest_context()
+	{
+		$this->maybe_expire_guest_context();
+
+		$guest_id = isset($_COOKIE[$this->get_cookie_name('guest_id')]) ? sanitize_text_field(wp_unslash($_COOKIE[$this->get_cookie_name('guest_id')])) : '';
+		$guest_email = isset($_COOKIE[$this->get_cookie_name('guest_email')]) ? sanitize_email(wp_unslash($_COOKIE[$this->get_cookie_name('guest_email')])) : '';
+		$session_start = isset($_COOKIE[$this->get_cookie_name('session_start')]) ? absint(wp_unslash($_COOKIE[$this->get_cookie_name('session_start')])) : 0;
+
+		return [
+			'guest_id' => $guest_id,
+			'guest_email' => $guest_email,
+			'session_start' => $session_start,
+		];
+	}
+
+	private function set_guest_context($guest_id, $guest_email = '')
+	{
+		$expires = time() + $this->guest_cookie_lifetime;
+		$this->set_cookie($this->get_cookie_name('guest_id'), sanitize_text_field($guest_id), $expires);
+		$this->set_cookie($this->get_cookie_name('session_start'), (string) time(), $expires);
+		if (!empty($guest_email)) {
+			$this->set_cookie($this->get_cookie_name('guest_email'), sanitize_email($guest_email), $expires);
+		}
+	}
+
+	private function maybe_expire_guest_context()
+	{
+		$session_start = isset($_COOKIE[$this->get_cookie_name('session_start')]) ? absint(wp_unslash($_COOKIE[$this->get_cookie_name('session_start')])) : 0;
+		$guest_id = isset($_COOKIE[$this->get_cookie_name('guest_id')]) ? sanitize_text_field(wp_unslash($_COOKIE[$this->get_cookie_name('guest_id')])) : '';
+
+		if (!$session_start || !$guest_id) {
+			return;
+		}
+
+		if ((time() - $session_start) <= $this->guest_cookie_lifetime) {
+			return;
+		}
+
 		global $wpdb;
 		$table = $wpdb->prefix . 'srkp_live_chat';
 		$saved_tz = get_option('srkp_timezone', 'Asia/Kolkata');
 		$dt = new DateTime('now', new DateTimeZone($saved_tz));
 
-		if (!session_id()) {
-			session_start();
-		}
-		if (!is_user_logged_in()) {
-			$session_lifetime = 3600;
-			if (isset($_SESSION['srkp_session_start']) && isset($_SESSION['srkp_guest_id'])) {
-				if (time() - $_SESSION['srkp_session_start'] > $session_lifetime) {
-					$guest_id = isset($_SESSION['srkp_guest_id']) ? sanitize_text_field($_SESSION['srkp_guest_id']) : '';
-					// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
-					$wpdb->update(
-						$table,
-						[
-							'status'     => 'inactive',
-							'updated_at' => $dt->format('Y-m-d H:i:s')
-						],
-						['user_id' => $guest_id]
-					);
-					$cache_key = 'srkp_live_chat_user_' . $guest_id;
-					wp_cache_delete( $cache_key, 'srkp_live_chat' );
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
+		$wpdb->update(
+			$table,
+			[
+				'status'     => 'inactive',
+				'updated_at' => $dt->format('Y-m-d H:i:s')
+			],
+			['user_id' => $guest_id]
+		);
+		wp_cache_delete('srkp_live_chat_user_' . $guest_id, 'srkp_live_chat');
+		$this->clear_guest_context();
+	}
 
-					unset($_SESSION['srkp_guest_id']);
-					unset($_SESSION['srkp_session_start']);
-				}
-			}
+	private function clear_guest_context()
+	{
+		$this->set_cookie($this->get_cookie_name('guest_id'), '', time() - HOUR_IN_SECONDS);
+		$this->set_cookie($this->get_cookie_name('guest_email'), '', time() - HOUR_IN_SECONDS);
+		$this->set_cookie($this->get_cookie_name('session_start'), '', time() - HOUR_IN_SECONDS);
+	}
+
+	private function get_cookie_name($suffix)
+	{
+		return 'srkp_live_support_' . $suffix;
+	}
+
+	private function set_cookie($name, $value, $expires)
+	{
+		if (headers_sent()) {
+			$_COOKIE[$name] = $value;
+			return;
 		}
+
+		setcookie(
+			$name,
+			$value,
+			[
+				'expires'  => $expires,
+				'path'     => COOKIEPATH ? COOKIEPATH : '/',
+				'domain'   => COOKIE_DOMAIN,
+				'secure'   => is_ssl(),
+				'httponly' => true,
+				'samesite' => 'Lax',
+			]
+		);
+		$_COOKIE[$name] = $value;
 	}
 }
