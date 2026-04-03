@@ -208,7 +208,8 @@
 		$("#srkp_smtp_test_btn").click(function () {
 			$("#srkp_smtp_test_result").text("Testing SMTP...");
 			$.post(ajaxurl, {
-				action: "srkp_test_smtp"
+				action: "srkp_test_smtp",
+				nonce: srkp_chat_admin.nonce
 			}, function (response) {
 				$("#srkp_smtp_test_result").html(response.data);
 			});

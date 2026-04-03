@@ -448,25 +448,27 @@ class Srkp_Live_Support_Admin
 
 	function srkp_clear_chat()
 	{
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_send_json_error( 'Not allowed', 403 );
+		}
+
 		$nonce = isset($_POST['nonce']) ? sanitize_text_field(wp_unslash($_POST['nonce'])) : '';
 		if (! wp_verify_nonce($nonce, 'srkp_clear_chat')) {
 			wp_send_json_error('Invalid nonce!');
 		}
 		$user_id = isset($_POST['user_id']) && !empty($_POST['user_id']) ? sanitize_text_field(wp_unslash($_POST['user_id'])) : '';
 		if ($user_id) {
-
 			global $wpdb;
-			$table 		      = esc_sql($wpdb->prefix . 'srkp_live_chat');
 			$messages_table   = esc_sql($wpdb->prefix . 'srkp_live_chat_messages');
-
 			$cache_key = 'srkp_live_chat_message_' . $user_id;
-			$row = wp_cache_get($cache_key, 'srkp_live_chat');
+			$message_id = wp_cache_get($cache_key, 'srkp_live_chat');
 
-			if ($row === false) {
+			if ($message_id === false) {
 				// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
 				$message_id = $wpdb->get_var($wpdb->prepare("SELECT m.id AS message_id FROM {$wpdb->prefix}srkp_live_chat AS u LEFT JOIN {$wpdb->prefix}srkp_live_chat_messages AS m ON u.id = m.user_id WHERE u.user_id = %s", $user_id));
-				wp_cache_set($cache_key, $row, 'srkp_live_chat', 60);
+				wp_cache_set($cache_key, $message_id, 'srkp_live_chat', 60);
 			}
+
 			if ($message_id) {
 				// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
 				$wpdb->delete($messages_table, ['id' => $message_id], ['%d']);
@@ -482,14 +484,19 @@ class Srkp_Live_Support_Admin
 		global $wpdb;
 		$table 		      = esc_sql($wpdb->prefix . 'srkp_live_chat');
 		$messages_table   = esc_sql($wpdb->prefix . 'srkp_live_chat_messages');
+
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_send_json_error( 'Not allowed', 403 );
+		}
+
 		$nonce = isset($_POST['nonce']) ? sanitize_text_field(wp_unslash($_POST['nonce'])) : '';
 		if (!wp_verify_nonce($nonce, 'srkp_delete_user')) {
 			wp_send_json_error('Invalid nonce!');
 		}
+		$user_id = isset($_POST['user_id']) && !empty($_POST['user_id']) ? sanitize_text_field(wp_unslash($_POST['user_id'])) : '';
 		$cache_key = 'srkp_live_chat_user_delete_' . $user_id;
 		$row = wp_cache_get($cache_key, 'srkp_live_chat');
 
-		$user_id = isset($_POST['user_id']) && !empty($_POST['user_id']) ? sanitize_text_field(wp_unslash($_POST['user_id'])) : '';
 		if ($user_id) {
 			if ($row === false) {
 				// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
@@ -510,80 +517,102 @@ class Srkp_Live_Support_Admin
 	}
 	// bulk user action handler
 
-function srkp_bulk_user_action_handler() {
+	function srkp_bulk_user_action_handler() {
 		global $wpdb;
-		if (isset($_POST['user_ids']) && is_array($_POST['user_ids'])) {
-			$user_ids = array_map('sanitize_text_field', wp_unslash($_POST['user_ids']));
+
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_send_json_error( [ 'message' => 'Not allowed' ], 403 );
+		}
+
+		$bulk_action = isset( $_POST['bulk_action'] ) ? sanitize_key( wp_unslash( $_POST['bulk_action'] ) ) : '';
+		$nonce       = isset( $_POST['nonce'] ) ? sanitize_text_field( wp_unslash( $_POST['nonce'] ) ) : '';
+		$nonce_map   = [
+			'clear'  => 'srkp_bulk_clear_chat',
+			'delete' => 'srkp_bulk_delete_user',
+			'read'   => 'srkp_bulk_read_all_user',
+		];
+
+		if ( ! isset( $nonce_map[ $bulk_action ] ) ) {
+			wp_send_json_error( [ 'message' => 'Invalid action' ], 400 );
+		}
+
+		if ( ! wp_verify_nonce( $nonce, $nonce_map[ $bulk_action ] ) ) {
+			wp_send_json_error( [ 'message' => 'Invalid nonce' ], 403 );
+		}
+
+		if ( isset( $_POST['user_ids'] ) && is_array( $_POST['user_ids'] ) ) {
+			$user_ids = array_map( 'sanitize_text_field', wp_unslash( $_POST['user_ids'] ) );
 		} else {
 			$user_ids = [];
 		}
 
-		$bulk_action = isset($_POST['bulk_action']) ? sanitize_text_field(wp_unslash($_POST['bulk_action'])) : '';
-		$nonce       = isset($_POST['nonce']) ? sanitize_text_field(wp_unslash($_POST['nonce'])) : '';
-		$cache_key = 'srkp_live_chat_bulk_action';
-		$row = wp_cache_get($cache_key, 'srkp_live_chat');
-			$message_id = [];
-			$srkp_live_chat_id= [];
-				foreach ($user_ids as $user_id) {
-					// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
-					$row = $wpdb->get_row($wpdb->prepare("SELECT u.id , m.id AS message_id FROM {$wpdb->prefix}srkp_live_chat AS u LEFT JOIN {$wpdb->prefix}srkp_live_chat_messages AS m ON u.id = m.user_id WHERE u.user_id = %s", $user_id));
-					if ($row->id) {
-						$srkp_live_chat_id[]=$row->id;
-					}
-					if ($row->message_id) {
-						$message_id[]=$row->message_id;	
-					}
-					wp_cache_set($cache_key, $row, 'srkp_live_chat', 60);
+		$cache_key         = 'srkp_live_chat_bulk_action';
+		$message_ids       = [];
+		$srkp_live_chat_ids = [];
 
-					}
-		switch ($bulk_action) {
+		foreach ( $user_ids as $user_id ) {
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+			$row = $wpdb->get_row( $wpdb->prepare( "SELECT u.id , m.id AS message_id FROM {$wpdb->prefix}srkp_live_chat AS u LEFT JOIN {$wpdb->prefix}srkp_live_chat_messages AS m ON u.id = m.user_id WHERE u.user_id = %s", $user_id ) );
+
+			if ( $row && ! empty( $row->id ) ) {
+				$srkp_live_chat_ids[] = (int) $row->id;
+			}
+
+			if ( $row && ! empty( $row->message_id ) ) {
+				$message_ids[] = (int) $row->message_id;
+			}
+
+			wp_cache_set( $cache_key, $row, 'srkp_live_chat', 60 );
+		}
+
+		switch ( $bulk_action ) {
 			case 'clear':
-				if (!wp_verify_nonce($nonce, 'srkp_bulk_clear_chat')) {
-					wp_send_json_error(['message' => 'Invalid clear nonce']);
+				if ( ! empty( $message_ids ) ) {
+					$this->bulk_delete( 'srkp_live_chat_messages', $message_ids );
 				}
-				if (!empty($message_id)) {
-					
-					$this->bulk_delete('srkp_live_chat_messages', $message_id);
-				}	
-				wp_send_json_success([
-				'message' => 'Chat messages cleared successfully'
-				]);
-			break;
+
+				wp_send_json_success(
+					[
+						'message' => 'Chat messages cleared successfully',
+					]
+				);
 
 			case 'delete':
-				if (!wp_verify_nonce($nonce, 'srkp_bulk_delete_user')) {
-					wp_send_json_error(['message' => 'Invalid delete nonce']);
+				if ( ! empty( $srkp_live_chat_ids ) ) {
+					$this->bulk_delete( 'srkp_live_chat', $srkp_live_chat_ids );
 				}
-				if (!empty($srkp_live_chat_id)) {
-					$this->bulk_delete('srkp_live_chat', $srkp_live_chat_id);
-				}
-				if (!empty($message_id)) {
-					$this->bulk_delete('srkp_live_chat_messages', $message_id);
-				}
-				wp_send_json_success([
-					'message' => 'Users deleted successfully'
-				]);
 
-			break;
+				if ( ! empty( $message_ids ) ) {
+					$this->bulk_delete( 'srkp_live_chat_messages', $message_ids );
+				}
+
+				wp_send_json_success(
+					[
+						'message' => 'Users deleted successfully',
+					]
+				);
+
 			case 'read':
-				if (!wp_verify_nonce($nonce, 'srkp_bulk_read_all_user')) {
-					wp_send_json_error(['message' => 'Invalid read nonce']);
-				}
-				if (!empty($message_id)) {				
-					foreach ($message_id as $msg_id) {
-						// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
-						$wpdb->update($wpdb->prefix . 'srkp_live_chat_messages', ['unread_count' => 0], ['id' => $msg_id], ['%d'], ['%d']);
+				if ( ! empty( $message_ids ) ) {
+					foreach ( $message_ids as $message_id ) {
+						// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+						$wpdb->update( $wpdb->prefix . 'srkp_live_chat_messages', [ 'unread_count' => 0 ], [ 'id' => $message_id ], [ '%d' ], [ '%d' ] );
 					}
-					wp_send_json_success([
-						'message' => 'Message seen successfully'
-					]);
-				}
-			break;
 
-			default:
-				wp_send_json_error(['message' => 'Invalid action']);
+					wp_send_json_success(
+						[
+							'message' => 'Message seen successfully',
+						]
+					);
+				}
+
+				wp_send_json_success(
+					[
+						'message' => 'No messages found for the selected users',
+					]
+				);
 		}
-}
+	}
 function bulk_delete($tablename, $ids){
 		global $wpdb;
 		$cache_key = 'srkp_live_chat_bulk_action';
@@ -600,6 +629,12 @@ function bulk_delete($tablename, $ids){
 
 
 public function srkp_test_smtp() {
+	check_ajax_referer( 'srkp_chat_nonce', 'nonce' );
+
+	if ( ! current_user_can( 'manage_options' ) ) {
+		wp_send_json_error( 'Not allowed', 403 );
+	}
+
     add_action('wp_mail_failed', function($error){
         $error_message = $error->get_error_message();
         wp_send_json_error("<span style='color:red;'>SMTP Error: $error_message</span>");
