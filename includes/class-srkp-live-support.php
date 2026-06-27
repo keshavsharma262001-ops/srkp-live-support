@@ -73,7 +73,7 @@ class Srkp_Live_Support
 		if (defined('SRKP_LIVE_SUPPORT_VERSION')) {
 			$this->version = SRKP_LIVE_SUPPORT_VERSION;
 		} else {
-			$this->version = '1.0.3';
+			$this->version = '1.0.5';
 		}
 		$this->plugin_name = 'srkp-live-support';
 

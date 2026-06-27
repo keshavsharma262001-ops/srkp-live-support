@@ -1,17 +1,19 @@
 === SRKP Live Support ===
-Contributors: srkp
+Contributors: keshav480
 Donate link: https://github.com/keshavsharma262001-ops/srkp-live-support
 Tags: live chat, support chat, customer support, real-time chat, helpdesk
 Requires at least: 5.0
 Requires PHP: 7.4
 Tested up to: 6.9
-Stable tag: 1.0.3
+Stable tag: 1.0.5
 License: GPLv2 or later
 License URI: http://www.gnu.org/licenses/gpl-2.0.html
 
 A real-time live chat system for WordPress. Provide instant support to your users using Pusher-powered live messaging.
 
 == Description ==
+= Watch Demo Video =
+[Watch the plugin demo on YouTube](https://www.youtube.com/watch?v=fk9BHfonuBQ)
 
 **SRKP Live Support** is a lightweight and powerful real-time chat plugin for WordPress.  
 It allows website owners to communicate instantly with their visitors using a clean, responsive chat widget.
@@ -96,6 +98,12 @@ Yes, all chats are safely stored in your WordPress database.
 
 == Changelog ==
 
+= 1.0.5 =
+* Updated version metadata for the next release.
+
+= 1.0.4 =
+* Updated version metadata and added a visible demo video link in the readme.
+
 = 1.0.3 =
 * Hardened admin AJAX security with nonce and capability checks.
 * Fixed bulk action review issue reported by the WordPress Plugins Team.
@@ -113,6 +121,9 @@ Yes, all chats are safely stored in your WordPress database.
 * Floating chat support button.
 
 == Upgrade Notice ==
+
+= 1.0.5 =
+Version metadata update for the next release.
 
 = 1.0.3 =
 Security and maintenance update with hardened admin AJAX validation and Plugin Check cleanup.
