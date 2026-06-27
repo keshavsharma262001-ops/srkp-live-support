@@ -16,9 +16,9 @@ $srkp_saved_tz = get_option( 'srkp_timezone', 'Asia/Kolkata' );
 $srkp_dt       = new DateTime( 'now', new DateTimeZone( $srkp_saved_tz ) );
 $srkp_current  = $srkp_dt->format( 'Y-m-d H:i:s' );
 ?>
-<div class="srkp-livechat-page-outer">
+<div class="wrap srkp-livechat-page-outer">
 <h1>SRKP Live Chat</h1>
-<div class="wrap srkp-chat-wrapper">
+<div class="srkp-chat-wrapper">
 
     <!-- USERS LIST -->
     <div id="srkp-user-list">
